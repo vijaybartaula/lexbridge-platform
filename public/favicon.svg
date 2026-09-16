@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <rect width="48" height="48" rx="8" fill="#0F172A" />
+  <!-- Pillar & Arch (Bridge Motif) -->
+  <path d="M10 38H38" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" />
+  <path d="M14 38V30C14 24.477 18.477 20 24 20C29.523 20 34 24.477 34 30V38" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Central Scales of Justice Pillar -->
+  <path d="M24 10V38" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round" />
+  <!-- Scales Balance Bar -->
+  <path d="M15 16H33" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" />
+  <!-- Left Scale Pan -->
+  <path d="M15 16L12 24H18L15 16Z" fill="#38BDF8" fill-opacity="0.2" stroke="#38BDF8" stroke-width="1.5" stroke-linejoin="round" />
+  <!-- Right Scale Pan -->
+  <path d="M33 16L30 24H36L33 16Z" fill="#38BDF8" fill-opacity="0.2" stroke="#38BDF8" stroke-width="1.5" stroke-linejoin="round" />
+</svg>

@@ -6,7 +6,8 @@ let mammoth: any = null
 
 async function loadPdfParse() {
   if (!pdf) {
-    pdf = (await import("pdf-parse")).default
+    const pdfModule = (await import("pdf-parse")) as any
+    pdf = pdfModule.default || pdfModule
   }
   return pdf
 }

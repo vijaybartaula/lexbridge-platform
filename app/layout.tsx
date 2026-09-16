@@ -1,27 +1,45 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from 'next/font/google'
+import type { Metadata, Viewport } from "next"
+import { Merriweather, Plus_Jakarta_Sans } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { ErrorBoundary } from "@/components/ui/error-boundary"
 
-const inter = Inter({ subsets: ["latin"] })
+const serifFont = Merriweather({
+  weight: ["300", "400", "700"],
+  subsets: ["latin"],
+  variable: "--font-serif",
+  display: "swap",
+})
 
-import type { Metadata } from "next";
+const sansFont = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+})
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+}
 
 export const metadata: Metadata = {
-  title: "LexBridge | Legal Translation Platform",
-  description: "AI-powered legal document translation for refugees and asylum seekers",
-  keywords: ["legal translation", "asylum", "immigration", "AI translation", "document processing"],
-  viewport: "width=device-width, initial-scale=1",
+  title: "LexBridge | Legal Translation Platform for Asylum & Human Rights",
+  description:
+    "AI-powered legal document translation platform designed for refugees, asylum applicants, and legal aid attorneys.",
+  keywords: [
+    "legal translation",
+    "asylum documentation",
+    "refugee legal aid",
+    "immigration law",
+    "evidentiary translation",
+  ],
   robots: "index, follow",
   icons: {
-    icon: "https://images.unsplash.com/photo-1543332164-6e82f355badc?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // 32x32 favicon
-    shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png", // 180x180 for Apple devices
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
   },
-
-};
+}
 
 export default function RootLayout({
   children,
@@ -29,8 +47,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={`${serifFont.variable} ${sansFont.variable}`}>
+      <body className="font-sans antialiased bg-[#FFF8E7] text-slate-900 min-h-screen selection:bg-[#EFE6D2]">
         <ErrorBoundary>
           {children}
           <Toaster />

@@ -1,286 +1,158 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { type NextRequest, NextResponse } from "next/server"
 
+// This route executes strictly on the server.
+// The Gemini API key is accessed exclusively via server-side environment variables (.env.local)
+// and is NEVER exposed to the frontend or via any client-side NEXT_PUBLIC_* variable.
 export async function POST(request: NextRequest) {
+  // Resolve API key strictly from server environment
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENAI_API_KEY ||
+    process.env.GOOGLE_API_KEY
+
+  if (!apiKey || apiKey.trim() === "") {
+    console.error("[LexBridge API] GEMINI_API_KEY is not configured in .env.local")
+    return NextResponse.json(
+      {
+        error: "Translation service unavailable",
+        details: "GEMINI_API_KEY is missing on the server. Please check .env.local.",
+      },
+      { status: 503 },
+    )
+  }
+
+  let requestData: { text?: string; sourceLang?: string; targetLang?: string; isLegal?: boolean } = {}
   try {
-    // Get API key with multiple fallbacks
-    const apiKey = process.env.GOOGLE_GENAI_API_KEY || 
-                   process.env.GOOGLE_API_KEY || 
-                   process.env.NEXT_PUBLIC_GOOGLE_API_KEY
+    requestData = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 })
+  }
 
-    console.log("Translation request - API key check:", {
-      hasGoogleGenAI: !!(process.env.GOOGLE_GENAI_API_KEY),
-      hasGoogleAPI: !!(process.env.GOOGLE_API_KEY),
-      hasPublicAPI: !!(process.env.NEXT_PUBLIC_GOOGLE_API_KEY),
-      keyLength: apiKey ? apiKey.length : 0,
-      nodeEnv: process.env.NODE_ENV
-    })
+  const { text, sourceLang, targetLang, isLegal = true } = requestData
 
-    // Validate API key exists
-    if (!apiKey || apiKey.trim() === "") {
-      console.error("Translation failed: Missing API key")
-      
-      return NextResponse.json(
-        {
-          error: "Service Temporarily Unavailable",
-          details: "The translation service is not properly configured in the deployment environment.",
-          supportInfo: {
-            email: "support@lexbridge.com",
-            errorCode: "CONFIG_001",
-            timestamp: new Date().toISOString()
-          },
-          recommendations: [
-            "This is a deployment configuration issue",
-            "The service works in development but needs API keys in production",
-            "Please contact support for immediate assistance",
-            "Expected resolution time: 24-48 hours"
-          ],
-          fallbackOptions: [
-            "Use the sample text feature to test functionality",
-            "Copy and paste text for manual translation",
-            "Contact support for urgent translation needs"
-          ]
-        },
-        { status: 503 },
-      )
-    }
+  if (!text || !text.trim() || !targetLang) {
+    return NextResponse.json(
+      { error: "Missing required parameters", details: "Both 'text' and 'targetLang' are required." },
+      { status: 400 },
+    )
+  }
 
-    // Parse request body
-    let requestData
-    try {
-      requestData = await request.json()
-    } catch (parseError) {
-      return NextResponse.json(
-        { error: "Invalid request format", details: "Unable to parse request body" },
-        { status: 400 }
-      )
-    }
+  if (text.length > 50000) {
+    return NextResponse.json(
+      { error: "Payload limit exceeded", details: "Document text must not exceed 50,000 characters." },
+      { status: 400 },
+    )
+  }
 
-    const { text, sourceLang, targetLang, isLegal } = requestData
+  let genAI: GoogleGenerativeAI
+  try {
+    genAI = new GoogleGenerativeAI(apiKey.trim())
+  } catch (err) {
+    console.error("[LexBridge API] GoogleGenerativeAI initialization error:", err)
+    return NextResponse.json({ error: "Failed to initialize translation engine" }, { status: 500 })
+  }
 
-    if (!text || !targetLang) {
-      return NextResponse.json({ 
-        error: "Missing required fields", 
-        details: "Both 'text' and 'targetLang' are required" 
-      }, { status: 400 })
-    }
+  const sourceName = sourceLang && sourceLang !== "auto" ? getLanguageName(sourceLang) : "the detected source language"
+  const targetName = getLanguageName(targetLang)
 
-    // Validate text length
-    if (text.length > 50000) {
-      return NextResponse.json({ 
-        error: "Text too long", 
-        details: "Please limit to 50,000 characters.",
-        currentLength: text.length,
-        maxLength: 50000
-      }, { status: 400 })
-    }
+  const prompt = isLegal
+    ? `You are an accredited legal translator specializing in asylum affidavits, refugee declarations, and human rights evidentiary documentation.
 
-    // Initialize Google AI client
-    let genAI, model
-    try {
-      genAI = new GoogleGenerativeAI(apiKey)
-      model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
-    } catch (initError) {
-      console.error("Failed to initialize Google AI:", initError)
-      return NextResponse.json(
-        {
-          error: "Service initialization failed",
-          details: "Unable to initialize translation service",
-          supportInfo: {
-            email: "support@lexbridge.com",
-            errorCode: "INIT_001"
-          }
-        },
-        { status: 503 }
-      )
-    }
+Translate the following legal affidavit/statement from ${sourceName} into ${targetName}.
 
-    const legalPrompt = `You are a professional legal translator specializing in asylum and immigration law. Translate the following document from ${sourceLang ? getLanguageName(sourceLang) : "the detected language"} into ${getLanguageName(targetLang)}, preserving all legal terminology and formatting. Do not simplify or omit any phrases. Maintain accuracy for named entities, dates, case numbers, and official titles. Use the tone and structure typical in official government or legal filings.
-
-IMPORTANT: Provide ONLY the translation. Do not include any explanations, notes, or additional commentary.
+Strict Translation Guidelines:
+1. Maintain exact legal and judicial terminology fidelity (e.g. well-founded fear, persecution, particular social group, political opinion, evidentiary documentation).
+2. Clearly preserve the author's distinction between personal experiences, direct observations, and personal opinions or beliefs.
+3. Preserve all paragraph numbering, structure, and formal legal formatting verbatim.
+4. Do not embellish, summarize, interpret, or omit any text.
+5. Provide ONLY the translated document text. Do not include markdown preamble, translator notes, or conversational intros/outros.
 
 Document to translate:
 ${text}`
-
-    const standardPrompt = `Translate the following text from ${sourceLang ? getLanguageName(sourceLang) : "the detected language"} to ${getLanguageName(targetLang)}. Provide only the translation without any additional commentary:
+    : `Translate the following text faithfully from ${sourceName} into ${targetName}. Maintain professional register and sentence structure. Provide only the translated content:
 
 ${text}`
 
-    const prompt = isLegal ? legalPrompt : standardPrompt
+  // Supported models in priority order
+  const modelCandidates = [
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
+  ]
 
+  let translatedText = ""
+  let modelUsed = ""
+  let lastError: unknown = null
+
+  for (const modelName of modelCandidates) {
     try {
-      console.log("Attempting translation with API key length:", apiKey.length)
-
+      const model = genAI.getGenerativeModel({ model: modelName })
       const result = await model.generateContent(prompt)
-      const response = await result.response
-      const translatedText = response.text()
-
-      if (!translatedText || translatedText.trim().length === 0) {
-        throw new Error("Empty response from AI model")
+      const rawOutput = result.response.text()
+      if (rawOutput && rawOutput.trim().length > 0) {
+        translatedText = rawOutput.trim()
+        modelUsed = modelName
+        break
       }
+    } catch (err) {
+      lastError = err
+      console.warn(`[LexBridge API] Model candidate ${modelName} encountered error:`, err)
+    }
+  }
 
-      console.log("Translation successful, response length:", translatedText.length)
+  if (!translatedText) {
+    const errorMsg = lastError instanceof Error ? lastError.message.toLowerCase() : ""
 
-      // Assess translation quality
-      const quality = assessTranslationQuality(text, translatedText)
-
-      return NextResponse.json({
-        translatedText: translatedText.trim(),
-        quality,
-        sourceLang: sourceLang || "auto",
-        targetLang,
-        success: true,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          textLength: text.length,
-          translationLength: translatedText.length,
-          isLegal
-        }
-      })
-    } catch (aiError) {
-      console.error("Google AI API error:", aiError)
-
-      // Handle specific Google AI errors
-      if (aiError instanceof Error) {
-        const errorMessage = aiError.message.toLowerCase()
-
-        if (
-          errorMessage.includes("api key") ||
-          errorMessage.includes("api_key") ||
-          errorMessage.includes("authentication") ||
-          errorMessage.includes("401")
-        ) {
-          return NextResponse.json(
-            {
-              error: "Authentication Error",
-              details: "The API key is invalid or has insufficient permissions.",
-              supportInfo: {
-                email: "support@lexbridge.com",
-                errorCode: "AUTH_001",
-                timestamp: new Date().toISOString()
-              },
-              recommendations: [
-                "API key may be invalid or expired",
-                "Check Google AI API permissions",
-                "Verify billing is enabled for the API key",
-                "Contact support for immediate assistance"
-              ]
-            },
-            { status: 401 },
-          )
-        }
-
-        if (errorMessage.includes("quota") || errorMessage.includes("rate limit") || errorMessage.includes("429")) {
-          return NextResponse.json(
-            {
-              error: "Service Temporarily Overloaded",
-              details: "The translation service is currently at capacity. Please try again in a few minutes.",
-              retryAfter: 60,
-              supportInfo: {
-                errorCode: "RATE_LIMIT_001",
-                timestamp: new Date().toISOString()
-              },
-              recommendations: [
-                "Wait 1-2 minutes before trying again",
-                "Try translating smaller text segments",
-                "Contact support for priority access"
-              ]
-            },
-            { status: 429 },
-          )
-        }
-
-        if (errorMessage.includes("model") || errorMessage.includes("not found") || errorMessage.includes("404")) {
-          return NextResponse.json(
-            {
-              error: "Translation Model Unavailable",
-              details: "The AI translation model is temporarily unavailable.",
-              supportInfo: {
-                email: "support@lexbridge.com",
-                errorCode: "MODEL_001",
-                timestamp: new Date().toISOString()
-              },
-              recommendations: [
-                "This is a temporary service issue",
-                "Try again in 5-10 minutes",
-                "Contact support if issue persists"
-              ]
-            },
-            { status: 503 },
-          )
-        }
-
-        if (errorMessage.includes("blocked") || errorMessage.includes("safety")) {
-          return NextResponse.json(
-            {
-              error: "Content Safety Filter",
-              details: "The content could not be translated due to safety filters.",
-              supportInfo: {
-                errorCode: "CONTENT_001",
-                timestamp: new Date().toISOString()
-              },
-              recommendations: [
-                "Try rephrasing the content",
-                "Remove any potentially sensitive information",
-                "Contact support for assistance with legal documents"
-              ]
-            },
-            { status: 400 },
-          )
-        }
-      }
-
+    if (
+      errorMsg.includes("api_key") ||
+      errorMsg.includes("api key") ||
+      errorMsg.includes("401") ||
+      errorMsg.includes("unauthenticated")
+    ) {
       return NextResponse.json(
-        {
-          error: "Translation Service Error",
-          details: "An unexpected error occurred during translation.",
-          supportInfo: {
-            email: "support@lexbridge.com",
-            errorCode: "AI_SERVICE_001",
-            timestamp: new Date().toISOString()
-          },
-          debugInfo: process.env.NODE_ENV === "development" ? {
-            error: aiError.message,
-            apiKeyLength: apiKey.length
-          } : undefined,
-          recommendations: [
-            "Try again in a few minutes",
-            "Check your internet connection",
-            "Contact support if the problem persists"
-          ]
-        },
-        { status: 500 },
+        { error: "Invalid API key", details: "The server's GEMINI_API_KEY is invalid or unauthorized." },
+        { status: 401 },
       )
     }
-  } catch (error) {
-    console.error("General translation error:", error)
 
+    if (errorMsg.includes("quota") || errorMsg.includes("429") || errorMsg.includes("resource_exhausted")) {
+      return NextResponse.json(
+        { error: "Rate limit reached", details: "Gemini API rate limit reached. Please retry in a few moments." },
+        { status: 429 },
+      )
+    }
+
+    console.error("[LexBridge API] All Gemini translation models failed. Last error:", lastError)
     return NextResponse.json(
       {
-        error: "System Error",
-        details: "An unexpected system error occurred.",
-        supportInfo: {
-          email: "support@lexbridge.com",
-          errorCode: "SYSTEM_001",
-          timestamp: new Date().toISOString()
-        },
-        debugInfo: process.env.NODE_ENV === "development" ? {
-          error: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined
-        } : undefined,
-        recommendations: [
-          "Refresh the page and try again",
-          "Check your internet connection",
-          "Contact technical support for assistance"
-        ]
+        error: "Translation failed",
+        details: lastError instanceof Error ? lastError.message : "All Gemini model candidates failed to return output.",
       },
       { status: 500 },
     )
   }
+
+  return NextResponse.json({
+    success: true,
+    translatedText,
+    quality: assessTranslationQuality(text, translatedText),
+    sourceLang: sourceLang || "auto",
+    targetLang,
+    modelUsed,
+    metadata: {
+      timestamp: new Date().toISOString(),
+      sourceLength: text.length,
+      translatedLength: translatedText.length,
+      isLegal,
+    },
+  })
 }
 
 function getLanguageName(code: string): string {
-  const languages: { [key: string]: string } = {
+  const map: Record<string, string> = {
     en: "English",
     es: "Spanish",
     fr: "French",
@@ -291,6 +163,8 @@ function getLanguageName(code: string): string {
     sw: "Swahili",
     am: "Amharic",
     ti: "Tigrinya",
+    uk: "Ukrainian",
+    ht: "Haitian Creole",
     de: "German",
     it: "Italian",
     pt: "Portuguese",
@@ -299,42 +173,14 @@ function getLanguageName(code: string): string {
     ne: "Nepali",
     hi: "Hindi",
     ur: "Urdu",
-    auto: "Auto-detect",
   }
-  return languages[code] || code
+  return map[code] || code
 }
 
-function assessTranslationQuality(source: string, translation: string): "high" | "medium" | "low" {
-  if (!translation || translation.length === 0) return "low"
-
-  const lengthRatio = translation.length / source.length
-  const hasContent = translation.trim().length > 10
-
-  // Check for legal terminology preservation
-  const legalTerms = [
-    "asylum",
-    "persecution",
-    "refugee",
-    "application",
-    "case",
-    "court",
-    "evidence",
-    "solicitud",
-    "asilo",
-    "persecución",
-    "शरण", // Nepali for asylum
-    "उत्पीडन", // Nepali for persecution
-  ]
-  const sourceLower = source.toLowerCase()
-  const translationLower = translation.toLowerCase()
-
-  const hasLegalTerms = legalTerms.some((term) => sourceLower.includes(term) || translationLower.includes(term))
-
-  if (lengthRatio > 0.5 && lengthRatio < 2.0 && hasContent && hasLegalTerms) {
-    return "high"
-  } else if (lengthRatio > 0.3 && lengthRatio < 3.0 && hasContent) {
-    return "medium"
-  } else {
-    return "low"
-  }
+function assessTranslationQuality(source: string, target: string): "high" | "medium" | "low" {
+  if (!target || target.length < 10) return "low"
+  const ratio = target.length / Math.max(source.length, 1)
+  if (ratio > 0.35 && ratio < 2.5) return "high"
+  if (ratio > 0.2 && ratio < 3.5) return "medium"
+  return "low"
 }

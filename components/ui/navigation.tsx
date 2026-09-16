@@ -1,204 +1,183 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Scale, Menu, X, Languages, Shield, Zap } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-
-const navigationItems = [
-  {
-    name: "Features",
-    href: "/#features",
-    icon: <Zap className="h-4 w-4" />,
-    description: "Explore our AI-powered translation tools",
-  },
-  {
-    name: "Mission",
-    href: "/#mission",
-    icon: <Shield className="h-4 w-4" />,
-    description: "Learn about our commitment to refugees",
-  },
-  {
-    name: "Translate",
-    href: "/translate",
-    icon: <Languages className="h-4 w-4" />,
-    description: "Start translating legal documents",
-    primary: true,
-  },
-]
+import { LexBridgeMark, LexiconTranslateIcon } from "@/components/ui/legal-icons"
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const pathname = usePathname()
+  const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20)
-    }
-
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
-  const toggleMenu = () => setIsOpen(!isOpen)
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? "hidden" : ""
+    return () => { document.body.style.overflow = "" }
+  }, [isOpen])
+
+  // Close on route change
+  useEffect(() => {
+    setIsOpen(false)
+  }, [pathname])
+
+  const navLinks = [
+    { name: "Asylum Workflow", href: "/#workflow" },
+    { name: "Architecture", href: "/#whitepaper" },
+  ]
 
   return (
-    <motion.nav
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-white/95 backdrop-blur-md shadow-lg border-b border-gray-200"
-          : "bg-white/80 backdrop-blur-sm border-b border-gray-100"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          {/* Logo */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center space-x-3">
-            <Link href="/" className="flex items-center space-x-3">
-              <div className="relative">
-                <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-lg">
-                  <Scale className="h-8 w-8 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-              </div>
-              <div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+    <>
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${
+          scrolled
+            ? "bg-[#FFF8E7]/95 backdrop-blur-md border-b border-[#E8DFC8] shadow-sm"
+            : "bg-[#FFF8E7] border-b border-[#E8DFC8]/60"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Brand */}
+            <Link href="/" className="flex items-center gap-3">
+              <LexBridgeMark size={32} />
+              <div className="flex flex-col leading-none">
+                <span className="text-[15px] font-bold tracking-tight text-slate-950 font-serif">
                   LexBridge
                 </span>
-                <p className="text-xs text-gray-500 -mt-1 font-medium">Legal Translation Platform</p>
+                <span className="text-[9px] uppercase tracking-[0.15em] text-slate-500 font-sans font-medium mt-0.5">
+                  Legal Translation Platform
+                </span>
               </div>
             </Link>
-          </motion.div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navigationItems.map((item) => (
-              <motion.div key={item.name} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                {item.primary ? (
-                  <Button
-                    asChild
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    <Link href={item.href} className="flex items-center space-x-2">
-                      {item.icon}
-                      <span>{item.name}</span>
-                    </Link>
-                  </Button>
-                ) : (
-                  <Link
-                    href={item.href}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                      pathname === item.href
-                        ? "text-blue-600 bg-blue-50"
-                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    {item.icon}
-                    <span>{item.name}</span>
-                  </Link>
-                )}
-              </motion.div>
-            ))}
-          </div>
+            {/* Desktop links */}
+            <div className="hidden md:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    pathname === link.href
+                      ? "text-slate-950 font-semibold bg-[#EFE6D2]"
+                      : "text-slate-700 hover:text-slate-950 hover:bg-[#F4ECE0]"
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
-            <Button variant="ghost" size="sm" onClick={toggleMenu} className="p-2 hover:bg-gray-100 transition-colors">
-              <AnimatePresence mode="wait">
-                {isOpen ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <X className="h-6 w-6" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Menu className="h-6 w-6" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Button>
+            {/* Desktop CTA */}
+            <div className="hidden md:flex items-center gap-3">
+              <Link
+                href="/translate"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-colors"
+              >
+                <LexiconTranslateIcon size={16} />
+                Launch Translator
+              </Link>
+            </div>
+
+            {/* Mobile hamburger */}
+            <button
+              type="button"
+              aria-label={isOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isOpen}
+              onClick={() => setIsOpen((v) => !v)}
+              className="md:hidden flex flex-col justify-center items-center w-9 h-9 rounded-md hover:bg-[#EFE6D2] transition-colors group"
+            >
+              <span
+                className={`block w-5 h-[1.5px] bg-slate-800 rounded-full transition-all duration-300 ${
+                  isOpen ? "translate-y-[6px] rotate-45" : ""
+                }`}
+              />
+              <span
+                className={`block w-5 h-[1.5px] bg-slate-800 rounded-full mt-[4px] transition-all duration-300 ${
+                  isOpen ? "opacity-0 scale-x-0" : ""
+                }`}
+              />
+              <span
+                className={`block w-5 h-[1.5px] bg-slate-800 rounded-full mt-[4px] transition-all duration-300 ${
+                  isOpen ? "-translate-y-[10px] -rotate-45" : ""
+                }`}
+              />
+            </button>
           </div>
         </div>
-      </div>
+      </nav>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="md:hidden border-t border-gray-200 bg-white/95 backdrop-blur-md"
+      {/* Mobile drawer overlay */}
+      <div
+        aria-hidden={!isOpen}
+        onClick={() => setIsOpen(false)}
+        className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] md:hidden transition-opacity duration-300 ${
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      />
+
+      {/* Mobile drawer — slides in smoothly from the RIGHT */}
+      <div
+        ref={drawerRef}
+        aria-hidden={!isOpen}
+        className={`fixed top-0 right-0 bottom-0 z-50 w-72 bg-[#FFF8E7] border-l border-[#E8DFC8] shadow-2xl md:hidden flex flex-col transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {/* Drawer header */}
+        <div className="flex items-center justify-between px-5 h-16 border-b border-[#E8DFC8]">
+          <div className="flex items-center gap-2.5">
+            <LexBridgeMark size={28} />
+            <span className="font-serif font-bold text-slate-950 text-sm">LexBridge</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setIsOpen(false)}
+            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#EFE6D2] text-slate-700 transition-colors"
           >
-            <div className="px-4 py-6 space-y-4">
-              {navigationItems.map((item, index) => (
-                <motion.div
-                  key={item.name}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Link
-                    href={item.href}
-                    onClick={() => setIsOpen(false)}
-                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
-                      item.primary
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg"
-                        : pathname === item.href
-                          ? "text-blue-600 bg-blue-50"
-                          : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className={`p-2 rounded-lg ${item.primary ? "bg-white/20" : "bg-gray-100"}`}>{item.icon}</div>
-                    <div>
-                      <div className="font-medium">{item.name}</div>
-                      <div className={`text-sm ${item.primary ? "text-blue-100" : "text-gray-500"}`}>
-                        {item.description}
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
 
-              {/* Mobile-only features */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="pt-4 border-t border-gray-200"
-              >
-                <div className="flex items-center justify-between text-sm text-gray-500">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    <span>AI Translation Active</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4" />
-                    <span>GDPR Compliant</span>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.nav>
+        {/* Drawer nav links */}
+        <nav className="flex-1 px-4 py-5 space-y-1 overflow-y-auto">
+          {navLinks.map((link) => (
+            <Link
+              key={link.name}
+              href={link.href}
+              onClick={() => setIsOpen(false)}
+              className={`flex items-center px-3 py-2.5 rounded-md text-sm transition-colors ${
+                pathname === link.href
+                  ? "bg-[#EFE6D2] text-slate-950 font-semibold"
+                  : "text-slate-700 hover:bg-[#F4ECE0] hover:text-slate-950"
+              }`}
+            >
+              {link.name}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Drawer footer CTA */}
+        <div className="px-4 py-5 border-t border-[#E8DFC8]">
+          <Link
+            href="/translate"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center justify-center gap-2 w-full py-3 text-sm font-medium rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-sm"
+          >
+            <LexiconTranslateIcon size={16} />
+            Launch Translator
+          </Link>
+        </div>
+      </div>
+    </>
   )
 }
